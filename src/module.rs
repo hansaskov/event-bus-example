@@ -33,7 +33,9 @@ impl ModuleCtx {
             inner: event_kind,
         };
 
-        self.sender.send(event).unwrap();
+        if let Err(e) = self.sender.send(event) {
+            eprintln!("Failed to send event in module {}: {}", self.name, e);
+        }
     }
 
     pub fn send_message(&self, message: String) {
