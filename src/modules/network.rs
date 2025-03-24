@@ -1,4 +1,3 @@
-use crate::event_bus::{Event, EventKind};
 use crate::module::{Module, ModuleCtx};
 use anyhow::Result;
 
@@ -16,15 +15,7 @@ impl Module for Network {
 
         loop {
             tokio::select! {
-                _ = interval.tick() => {
-                    let event = Event {
-                        module: self.ctx.name.to_string(),
-                        inner: EventKind::Message("Completed some work".to_string()),
-                    };
-                    self.ctx.sender
-                        .send(event)
-                        .unwrap();
-                },
+                _ = interval.tick() => self.ctx.send_message("5 seconds has passed".to_string())
             }
         }
     }

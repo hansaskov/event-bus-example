@@ -18,7 +18,7 @@ impl Module for Logger {
                     match e {
                         Ok(event) => {
                             match event.inner {
-                                EventKind::Message(message) => println!("{}: received event: {}", &self.ctx.name, message),
+                                EventKind::Message(message) => println!("{}: received event from {}: {}",  &self.ctx.name, event.module, message),
                                 EventKind::Reading(reading) => println!("{}: received reading: {} {} {}", &self.ctx.name, reading.name, reading.value, reading.unit)
                             }
                         },
