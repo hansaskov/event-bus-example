@@ -9,6 +9,15 @@ anyhow = "1.0.97"
 serde = "1.0.219"
 wmi = "0.15.1"
 
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+enum_glob_use = "deny"
+#pedantic = "deny"
+#nursery = "deny"
+unwrap_used = "deny"
+
 [profile.release]
 opt-level = "z"     # Optimize for size.
 lto = true          # Enable Link Time Optimization

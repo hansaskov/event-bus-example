@@ -20,7 +20,7 @@ impl ModuleCtx {
         let sender = bus.sender.clone();
         let receiver = bus.subscribe();
 
-        ModuleCtx {
+        Self {
             name: name.to_string(),
             sender,
             receiver,

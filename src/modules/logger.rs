@@ -8,7 +8,7 @@ pub struct Logger {
 
 impl Module for Logger {
     fn new(ctx: ModuleCtx) -> Self {
-        Logger { ctx }
+        Self { ctx }
     }
 
     async fn run(&mut self) -> Result<()> {
@@ -22,7 +22,7 @@ impl Module for Logger {
                                 EventKind::Reading(reading) => println!("{}: received reading: {} {} {}", &self.ctx.name, reading.name, reading.value, reading.unit)
                             }
                         },
-                        Err(e) => println!("Error: {}", e),
+                        Err(e) => println!("Error: {e}")
                     }
                 },
             }

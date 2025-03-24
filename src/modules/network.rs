@@ -7,7 +7,7 @@ pub struct Network {
 
 impl Module for Network {
     fn new(ctx: ModuleCtx) -> Self {
-        Network { ctx }
+        Self { ctx }
     }
 
     async fn run(&mut self) -> Result<()> {

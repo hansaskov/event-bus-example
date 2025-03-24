@@ -82,15 +82,21 @@ impl Monitoring {
             .raw_query(&query)
             .context("Failed to query sensor data")?;
 
-        // Select the first value. 
-        let value = sensors.first().context(format!("No data found for {}. \t Is LibreHardwareMonitor Running?", config.query_name))?.value;
+        // Select the first value.
+        let value = sensors
+            .first()
+            .context(format!(
+                "No data found for {}. \t Is LibreHardwareMonitor Running?",
+                config.query_name
+            ))?
+            .value;
 
         Ok(Reading {
             time: std::time::SystemTime::now(),
             category: config.category.to_string(),
             name: config.name.to_string(),
             unit: config.unit.to_string(),
-            value,            
+            value,
         })
     }
 }
@@ -106,7 +112,7 @@ impl Module for Monitoring {
             .context("Failed to connect to WMI namespace")
             .expect("WMI connection");
 
-        Monitoring {
+        Self {
             ctx,
             wmi_con,
             sensors: Self::sensor_configs(),
@@ -118,12 +124,15 @@ impl Module for Monitoring {
         let mut interval = time::interval(Duration::from_secs(1));
 
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {
+                    for sensor in &self.sensors {
+                        match self.fetch_reading(sensor) {
+                            Ok(reading) => self.ctx.send_reading(reading),
+                            Err(e) => self.ctx.send_message(format!("{e}")),
+                        }
+                    }
 
-            for sensor in &self.sensors {
-                match self.fetch_reading(sensor) {
-                    Ok(reading) => self.ctx.send_reading(reading),
-                    Err(e) => self.ctx.send_message(format!("{}", e)),
                 }
             }
         }
