@@ -5,8 +5,8 @@ use serde::Deserialize;
 use tokio::time;
 use wmi::{COMLibrary, WMIConnection};
 
-use crate::event_bus::Reading;
 use crate::module::{Module, ModuleCtx};
+use crate::reading::Reading;
 
 /// Sensor types for hardware monitoring
 #[derive(Deserialize, Debug, Clone)]
@@ -39,6 +39,22 @@ struct WmiSensor {
 }
 
 impl Monitoring {
+    pub fn new(ctx: ModuleCtx) -> Self {
+        let com_con = COMLibrary::new()
+            .context("Failed to initialize COM library")
+            .expect("COM library initialization");
+
+        let wmi_con = WMIConnection::with_namespace_path("ROOT\\LibreHardwareMonitor", com_con)
+            .context("Failed to connect to WMI namespace")
+            .expect("WMI connection");
+
+        Self {
+            ctx,
+            wmi_con,
+            sensors: Self::sensor_configs(),
+        }
+    }
+
     /// Default sensor configurations
     fn sensor_configs() -> Vec<SensorConfig> {
         vec![
@@ -102,23 +118,6 @@ impl Monitoring {
 }
 
 impl Module for Monitoring {
-    /// Creates a new Monitoring instance
-    fn new(ctx: ModuleCtx) -> Self {
-        let com_con = COMLibrary::new()
-            .context("Failed to initialize COM library")
-            .expect("COM library initialization");
-
-        let wmi_con = WMIConnection::with_namespace_path("ROOT\\LibreHardwareMonitor", com_con)
-            .context("Failed to connect to WMI namespace")
-            .expect("WMI connection");
-
-        Self {
-            ctx,
-            wmi_con,
-            sensors: Self::sensor_configs(),
-        }
-    }
-
     /// Runs the monitoring loop
     async fn run(&mut self) -> Result<()> {
         let mut interval = time::interval(Duration::from_secs(1));
@@ -129,7 +128,7 @@ impl Module for Monitoring {
                     for sensor in &self.sensors {
                         match self.fetch_reading(sensor) {
                             Ok(reading) => self.ctx.send_reading(reading),
-                            Err(e) => self.ctx.send_message(format!("{e}")),
+                            Err(e) => self.ctx.send_log(format!("{e}")),
                         }
                     }
 

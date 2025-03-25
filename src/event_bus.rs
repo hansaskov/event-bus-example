@@ -1,3 +1,5 @@
+use crate::reading::Reading;
+use serde::Serialize;
 use tokio::sync::broadcast;
 
 #[derive(Clone, Debug)]
@@ -8,17 +10,8 @@ pub struct Event {
 
 #[derive(Clone, Debug)]
 pub enum EventKind {
-    Message(String),
+    Log(String),
     Reading(Reading),
-}
-
-#[derive(Clone, Debug)]
-pub struct Reading {
-    pub time: std::time::SystemTime,
-    pub name: String,
-    pub value: f32,
-    pub unit: String,
-    pub category: String,
 }
 
 #[derive(Debug)]

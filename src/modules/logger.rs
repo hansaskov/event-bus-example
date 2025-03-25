@@ -6,11 +6,13 @@ pub struct Logger {
     ctx: ModuleCtx,
 }
 
-impl Module for Logger {
-    fn new(ctx: ModuleCtx) -> Self {
+impl Logger {
+    pub fn new(ctx: ModuleCtx) -> Self {
         Self { ctx }
     }
+}
 
+impl Module for Logger {
     async fn run(&mut self) -> Result<()> {
         loop {
             tokio::select! {
@@ -18,7 +20,7 @@ impl Module for Logger {
                     match e {
                         Ok(event) => {
                             match event.inner {
-                                EventKind::Message(message) => println!("{}: received event from {}: {}",  &self.ctx.name, event.module, message),
+                                EventKind::Log(message) => println!("{}: received event from {}: {}",  &self.ctx.name, event.module, message),
                                 EventKind::Reading(reading) => println!("{}: received reading: {} {} {}", &self.ctx.name, reading.name, reading.value, reading.unit)
                             }
                         },

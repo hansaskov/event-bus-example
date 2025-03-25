@@ -1,10 +1,10 @@
-use crate::event_bus::{Event, EventBus, EventKind, Reading};
+use crate::event_bus::{Event, EventBus, EventKind};
+use crate::reading::Reading;
 
 use anyhow::Result;
 use tokio::sync::broadcast;
 
 pub trait Module {
-    fn new(ctx: ModuleCtx) -> Self;
     fn run(&mut self) -> impl Future<Output = Result<()>>;
 }
 
@@ -38,8 +38,8 @@ impl ModuleCtx {
         }
     }
 
-    pub fn send_message(&self, message: String) {
-        self.send(EventKind::Message(message));
+    pub fn send_log(&self, message: String) {
+        self.send(EventKind::Log(message));
     }
 
     pub fn send_reading(&self, reading: Reading) {
