@@ -1,5 +1,4 @@
 use crate::reading::Reading;
-use serde::Serialize;
 use tokio::sync::broadcast;
 
 #[derive(Clone, Debug)]

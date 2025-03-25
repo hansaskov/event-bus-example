@@ -5,12 +5,13 @@ edition = "2024"
 
 [dependencies]
 tokio = { version = "1.44.1", features = ["full"] }
-anyhow = "1.0.97"
-serde = "1.0.219"
-wmi = "0.15.1"
 reqwest = {version = "0.12.15", features = ["json"]}
 clap = { version = "4.5.32", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0.97"
+wmi = "0.15.1"
 chrono = "0.4.40"
+toml = "0.8.20"
 
 [lints.rust]
 unsafe_code = "forbid"

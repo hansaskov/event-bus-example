@@ -1,45 +1,43 @@
+use std::sync::Mutex;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::time;
 use wmi::{COMLibrary, WMIConnection};
 
 use crate::module::{Module, ModuleCtx};
 use crate::reading::Reading;
 
-/// Sensor types for hardware monitoring
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub enum SensorType {
     Temperature,
     Load,
 }
 
-/// Configuration for a hardware sensor
-struct SensorConfig {
-    category: &'static str,
-    name: &'static str,
-    unit: &'static str,
-    sensor_type: SensorType,
-    query_name: &'static str,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SensorConfig {
+    pub category: String,
+    pub name: String,
+    pub unit: String,
+    pub sensor_type: SensorType,
+    pub query_name: String,
 }
 
-/// Hardware monitoring module
 pub struct Monitoring {
     ctx: ModuleCtx,
-    wmi_con: WMIConnection,
+    wmi_con: Mutex<WMIConnection>,
     sensors: Vec<SensorConfig>,
 }
 
-/// Represents raw sensor data from WMI
 #[derive(Deserialize)]
 struct WmiSensor {
     value: f32,
 }
 
 impl Monitoring {
-    pub fn new(ctx: ModuleCtx) -> Self {
+    pub fn new(ctx: ModuleCtx, sensors_config: Vec<SensorConfig>) -> Self {
         let com_con = COMLibrary::new()
             .context("Failed to initialize COM library")
             .expect("COM library initialization");
@@ -50,39 +48,37 @@ impl Monitoring {
 
         Self {
             ctx,
-            wmi_con,
-            sensors: Self::sensor_configs(),
+            wmi_con: Mutex::new(wmi_con), // Wrap in Mutex
+            sensors: sensors_config,
         }
     }
 
-    /// Default sensor configurations
-    fn sensor_configs() -> Vec<SensorConfig> {
+    pub fn sensor_configs() -> Vec<SensorConfig> {
         vec![
             SensorConfig {
-                category: "computer",
-                name: "CPU Temperature",
-                unit: "°C",
+                category: "computer".to_string(),
+                name: "CPU Temperature".to_string(),
+                unit: "°C".to_string(),
                 sensor_type: SensorType::Temperature,
-                query_name: "Core",
+                query_name: "Core".to_string(),
             },
             SensorConfig {
-                category: "computer",
-                name: "CPU Usage",
-                unit: "%",
+                category: "computer".to_string(),
+                name: "CPU Usage".to_string(),
+                unit: "%".to_string(),
                 sensor_type: SensorType::Load,
-                query_name: "CPU Total",
+                query_name: "CPU Total".to_string(),
             },
             SensorConfig {
-                category: "computer",
-                name: "Memory Usage",
-                unit: "%",
+                category: "computer".to_string(),
+                name: "Memory Usage".to_string(),
+                unit: "%".to_string(),
                 sensor_type: SensorType::Load,
-                query_name: "Memory",
+                query_name: "Memory".to_string(),
             },
         ]
     }
 
-    /// Builds a WMI query for a specific sensor
     fn build_query(config: &SensorConfig) -> String {
         format!(
             "SELECT * FROM Sensor WHERE SensorType = '{:?}' AND Name LIKE '%{}%'",
@@ -90,15 +86,18 @@ impl Monitoring {
         )
     }
 
-    /// Fetches a reading for a single sensor
     fn fetch_reading(&self, config: &SensorConfig) -> Result<Reading> {
         let query = Self::build_query(config);
-        let sensors: Vec<WmiSensor> = self
+        // Lock the WMIConnection to use it
+        let wmi_con = self
             .wmi_con
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire WMI connection lock"))?;
+
+        let sensors: Vec<WmiSensor> = wmi_con
             .raw_query(&query)
             .context("Failed to query sensor data")?;
 
-        // Select the first value.
         let value = sensors
             .first()
             .context(format!(
@@ -118,7 +117,6 @@ impl Monitoring {
 }
 
 impl Module for Monitoring {
-    /// Runs the monitoring loop
     async fn run(&mut self) -> Result<()> {
         let mut interval = time::interval(Duration::from_secs(1));
 
@@ -131,7 +129,6 @@ impl Module for Monitoring {
                             Err(e) => self.ctx.send_log(format!("{e}")),
                         }
                     }
-
                 }
             }
         }

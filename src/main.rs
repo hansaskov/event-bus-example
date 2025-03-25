@@ -6,39 +6,69 @@ pub mod reading;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, Config};
 use event_bus::EventBus;
 use module::{Module, ModuleCtx};
 use modules::logger::Logger;
 use modules::monitoring::Monitoring;
 use modules::network::Network;
 use modules::uploader::Uploader;
+use std::thread;
+use tokio::task::JoinSet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let config = Config::parse_file(cli.config)?;
+
+    println!("{:?}", config.monitoring);
 
     let event_bus = EventBus::new();
-
     let logger_ctx = ModuleCtx::new("logger", &event_bus);
-    let mut logger = Logger::new(logger_ctx);
-
     let network_ctx = ModuleCtx::new("network", &event_bus);
-    let mut network = Network::new(network_ctx);
-
-    let monitoring_ctx = ModuleCtx::new("monitoring", &event_bus);
-    let mut monitoring = Monitoring::new(monitoring_ctx);
-
     let uploader_ctx = ModuleCtx::new("uploader", &event_bus);
-    let mut uploader = Uploader::new(uploader_ctx, cli.upload_config);
+    let monitoring_ctx = ModuleCtx::new("monitoring", &event_bus);
 
-    tokio::join!(
-        network.run(),
-        logger.run(),
-        monitoring.run(),
-        uploader.run()
-    )
-    .0?;
+    // Used to store async tasks. 
+    let mut set = JoinSet::new();
+
+    // Logger
+    set.spawn(async move { 
+        Logger::new(logger_ctx).run().await 
+    });
+
+    // Network
+    set.spawn(async move { 
+        Network::new(network_ctx).run().await 
+    });
+
+    // Uploader
+    if let Some(arguments) = config.upload {
+        set.spawn(async move { 
+            Uploader::new(uploader_ctx, arguments).run().await 
+        });
+    }
+
+    // Monitoring
+    // Create a dedicated thread for monitoring (WMI must stay on one thread)
+    if let Some(sensors_config) = config.monitoring {
+        thread::spawn(move || {
+            let mut monitoring = Monitoring::new(monitoring_ctx, sensors_config);
+            if let Err(e) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(monitoring.run())
+            {
+                eprintln!("Monitoring error: {}", e);
+            }
+        });
+    }
+
+    
+
+    // Wait for all tasks to complete
+    set.join_all().await;
 
     Ok(())
 }
