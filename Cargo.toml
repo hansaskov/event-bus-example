@@ -11,6 +11,9 @@ wmi = "0.15.1"
 reqwest = {version = "0.12.15", features = ["json"]}
 clap = { version = "4.5.32", features = ["derive"] }
 chrono = "0.4.40"
+pico-args = "0.5"
+async-opcua = { version = "0.14", features = ["client", "console-logging"] }
+openssl = { version = "0.10", features = ["vendored"] }
 
 [lints.rust]
 unsafe_code = "forbid"
