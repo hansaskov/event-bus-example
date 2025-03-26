@@ -11,7 +11,6 @@ use event_bus::EventBus;
 use module::{Module, ModuleCtx};
 use modules::logger::Logger;
 use modules::monitoring::Monitoring;
-use modules::network::Network;
 use modules::opcua::OPCUA;
 use modules::uploader::Uploader;
 use std::thread;

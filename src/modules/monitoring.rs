@@ -53,32 +53,6 @@ impl Monitoring {
         }
     }
 
-    pub fn sensor_configs() -> Vec<SensorConfig> {
-        vec![
-            SensorConfig {
-                category: "computer".to_string(),
-                name: "CPU Temperature".to_string(),
-                unit: "°C".to_string(),
-                sensor_type: SensorType::Temperature,
-                query_name: "Core".to_string(),
-            },
-            SensorConfig {
-                category: "computer".to_string(),
-                name: "CPU Usage".to_string(),
-                unit: "%".to_string(),
-                sensor_type: SensorType::Load,
-                query_name: "CPU Total".to_string(),
-            },
-            SensorConfig {
-                category: "computer".to_string(),
-                name: "Memory Usage".to_string(),
-                unit: "%".to_string(),
-                sensor_type: SensorType::Load,
-                query_name: "Memory".to_string(),
-            },
-        ]
-    }
-
     fn build_query(config: &SensorConfig) -> String {
         format!(
             "SELECT * FROM Sensor WHERE SensorType = '{:?}' AND Name LIKE '%{}%'",

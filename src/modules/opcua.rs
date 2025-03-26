@@ -65,7 +65,7 @@ impl OPCUA {
                 0,
                 0,
                 true,
-                DataChangeCallback::new(move |dv, item| {
+                DataChangeCallback::new(move |dv, _item| {
                     println!("Data change from server:");
                     println!("Data value: {:?}", dv.value);
                     let value_string = if let Some(ref value) = dv.value {
