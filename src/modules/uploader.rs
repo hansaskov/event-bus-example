@@ -75,6 +75,10 @@ impl Module for Uploader {
                 },
 
                 _ = interval.tick() => {
+                    if batch.is_empty() {
+                        continue;
+                    }
+                    
                     match self.send(batch.clone()).await {
                         Ok(_) => {
                             batch.clear();
