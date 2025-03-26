@@ -104,7 +104,7 @@ impl OPCUA {
                         None => SystemTime::now(),
                     };
 
-                    let name = item.item_to_monitor().type_name();
+                    let name = &item.item_to_monitor().data_encoding.name;
 
                     let reading = Reading {
                         name: name.to_string(),
