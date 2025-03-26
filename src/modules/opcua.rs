@@ -4,7 +4,7 @@ use opcua::{
     client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, Session},
     crypto::SecurityPolicy,
     types::{
-        DataValue, EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId, TimestampsToReturn, UserTokenPolicy
+        EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId, TimestampsToReturn, UserTokenPolicy
     },
 };
 use serde::{Deserialize, Serialize};
@@ -19,11 +19,11 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewNodeId {
     pub namespace: u16,
-    pub variable: String
+    pub variable: String,
+    pub name: String,
+    pub category: String,
+    pub unit: String
 }
-
-
-
 
 pub struct OPCUA {
     ctx: ModuleCtx,
@@ -47,18 +47,6 @@ impl OPCUA {
         Self { ctx, client, config }
     }
 
-    pub fn data_value_to_string(data_value: &DataValue) -> String {
-        if let Some(ref value) = data_value.value {
-            // Convert the variant value to a string representation
-            format!("{:?}", value)
-        } else if let Some(ref status) = data_value.status {
-            // Return error status as string if value is not present
-            format!("Error: {}", status)
-        } else {
-            "No value or status".to_string()
-        }
-    }
-
     pub async fn subscribe_to_variables(&self, session: Arc<Session>) -> Result<()> {
         // Creates a subscription with a data change callback
         let sender = self.ctx.sender.clone();
@@ -73,21 +61,16 @@ impl OPCUA {
                 0,
                 true,
                 DataChangeCallback::new(move |dv, _item| {
-                    println!("Data change from server:");
-                    println!("Data value: {:?}", dv.value);
-                    let value_string = if let Some(ref value) = dv.value {
-                        format!("{:?}", value)
-                    } else if let Some(ref status) = dv.status {
-                        format!("Error: {}", status)
-                    } else {
-                        "No value or status".to_string()
+
+                    let message = match dv.value {
+                        Some(value) => value.to_string(),
+                        None => "error".to_string(),
                     };
-                    println!("Data value as string: {}", value_string);
-                    
+
                     // Create and send the event directly
                     let event = Event {
                         module: module_name.clone(),
-                        inner: EventKind::Log(value_string),
+                        inner: EventKind::Log(message),
                     };
                     
                     if let Err(e) = sender.send(event) {
