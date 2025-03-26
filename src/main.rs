@@ -26,30 +26,24 @@ async fn main() -> Result<()> {
     let logger_ctx = ModuleCtx::new("logger", &event_bus);
     let uploader_ctx = ModuleCtx::new("uploader", &event_bus);
     let monitoring_ctx = ModuleCtx::new("monitoring", &event_bus);
-    
-    // Used to store async tasks. 
+
+    // Used to store async tasks.
     let mut set = JoinSet::new();
 
     // OPCUA
     match config.opcua {
         Some(opcua_config) => {
-            set.spawn(async move { 
-                OPCUA::new(opcua_ctx, opcua_config).run().await 
-            });
-        },
-        None =>  println!("Warn: Skipping OPCUA")    
+            set.spawn(async move { OPCUA::new(opcua_ctx, opcua_config).run().await });
+        }
+        None => println!("Warn: Skipping OPCUA"),
     }
 
     // Logger
-    set.spawn(async move { 
-        Logger::new(logger_ctx).run().await 
-    });
+    set.spawn(async move { Logger::new(logger_ctx).run().await });
 
     // Uploader
     if let Some(arguments) = config.upload {
-        set.spawn(async move { 
-            Uploader::new(uploader_ctx, arguments).run().await 
-        });
+        set.spawn(async move { Uploader::new(uploader_ctx, arguments).run().await });
     }
 
     // Monitoring

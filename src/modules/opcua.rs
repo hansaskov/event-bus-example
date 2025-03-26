@@ -1,19 +1,27 @@
-use crate::{event_bus::{Event, EventKind}, module::{Module, ModuleCtx}};
+use crate::{
+    event_bus::{Event, EventKind},
+    module::{Module, ModuleCtx},
+    reading::Reading,
+};
 use anyhow::{Ok, Result};
 use opcua::{
     client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, Session},
     crypto::SecurityPolicy,
     types::{
-        EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId, TimestampsToReturn, UserTokenPolicy
+        DynEncodable, EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId,
+        TimestampsToReturn, UserTokenPolicy,
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub url: String,
-    pub node_ids: Vec<NewNodeId>
+    pub node_ids: Vec<NewNodeId>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,15 +30,14 @@ pub struct NewNodeId {
     pub variable: String,
     pub name: String,
     pub category: String,
-    pub unit: String
+    pub unit: String,
 }
 
 pub struct OPCUA {
     ctx: ModuleCtx,
     client: Client,
-    config: Config
+    config: Config,
 }
-
 
 impl OPCUA {
     pub fn new(ctx: ModuleCtx, config: Config) -> Self {
@@ -44,7 +51,11 @@ impl OPCUA {
             .client()
             .unwrap();
 
-        Self { ctx, client, config }
+        Self {
+            ctx,
+            client,
+            config,
+        }
     }
 
     pub async fn subscribe_to_variables(&self, session: Arc<Session>) -> Result<()> {
@@ -60,43 +71,80 @@ impl OPCUA {
                 0,
                 0,
                 true,
-                DataChangeCallback::new(move |dv, _item| {
+                DataChangeCallback::new(move |dv, item| {
+                    let variant = match dv.value {
+                        Some(value) => value,
+                        None => return,
+                    };
 
-                    let message = match dv.value {
-                        Some(value) => value.to_string(),
-                        None => "error".to_string(),
+                    let float = match variant {
+                        opcua::types::Variant::Int16(i) => i as f32,
+                        opcua::types::Variant::UInt16(i) => i as f32,
+                        opcua::types::Variant::Int32(i) => i as f32,
+                        opcua::types::Variant::UInt32(i) => i as f32,
+                        opcua::types::Variant::Int64(i) => i as f32,
+                        opcua::types::Variant::UInt64(i) => i as f32,
+                        opcua::types::Variant::Float(f) => f,
+                        opcua::types::Variant::Double(f) => f as f32,
+                        _ => return,
                     };
 
                     // Create and send the event directly
                     let event = Event {
                         module: module_name.clone(),
-                        inner: EventKind::Log(message),
+                        inner: EventKind::Log(variant.to_string()),
                     };
-                    
+
                     if let Err(e) = sender.send(event) {
                         eprintln!("Failed to send event: {}", e);
+                    }
+
+                    let time: SystemTime = match dv.server_timestamp {
+                        Some(time) => time.as_chrono().into(),
+                        None => SystemTime::now(),
+                    };
+
+                    let name = item.item_to_monitor().type_name();
+
+                    let reading = Reading {
+                        name: name.to_string(),
+                        category: "PLC".into(),
+                        unit: "Unit".into(),
+                        value: float,
+                        time: time,
+                    };
+
+                    // Create and send the event directly
+                    let event = Event {
+                        module: module_name.clone(),
+                        inner: EventKind::Reading(reading),
+                    };
+
+                    if let Err(e) = sender.send(event) {
+                        eprintln!("Failed to send readings: {}", e);
                     }
                 }),
             )
             .await?;
         println!("Created a subscription with id = {}", subscription_id);
-    
+
         // Create some monitored items
-        let items_to_create: Vec<MonitoredItemCreateRequest> = self.config.node_ids
+        let items_to_create: Vec<MonitoredItemCreateRequest> = self
+            .config
+            .node_ids
             .iter()
             .map(|node| NodeId::new(node.namespace, node.variable.clone()).into())
             .collect();
         let _ = session
             .create_monitored_items(subscription_id, TimestampsToReturn::Both, items_to_create)
             .await?;
-    
+
         Ok(())
     }
 }
 
 impl Module for OPCUA {
     async fn run(&mut self) -> Result<()> {
-
         let endpoint: EndpointDescription = (
             self.config.url.as_str(),
             SecurityPolicy::None.to_str(),
@@ -105,7 +153,11 @@ impl Module for OPCUA {
         )
             .into();
 
-        let (session, event_loop) = self.client.connect_to_matching_endpoint(endpoint, IdentityToken::Anonymous).await.unwrap();
+        let (session, event_loop) = self
+            .client
+            .connect_to_matching_endpoint(endpoint, IdentityToken::Anonymous)
+            .await
+            .unwrap();
 
         let handle = event_loop.spawn();
         session.wait_for_connection().await;
@@ -128,7 +180,7 @@ impl Module for OPCUA {
         });
 
         handle.await.unwrap();
-       
+
         Ok(())
     }
 }
