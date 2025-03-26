@@ -1,4 +1,4 @@
-use clap::Args;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use crate::event_bus::EventKind;
@@ -7,13 +7,10 @@ use crate::reading::Reading;
 use anyhow::{Context, Result};
 use reqwest::Client;
 
-#[derive(Args, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-    #[arg(long)]
-    url: String,
-
-    #[arg(long)]
-    key: String,
+    pub url: String,
+    pub key: String,
 }
 
 pub struct Uploader {
