@@ -3,6 +3,10 @@
 url = "http://localhost:3000/api/readings"
 key = "jiogioajiosa"
 
+[opcua]
+url="opc.tcp://127.0.0.1:4855"
+namespace=2
+variables=["v1","v2","v3","v4"]
 
 [[monitoring]]
 category = "computer"

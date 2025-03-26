@@ -12,6 +12,7 @@ use module::{Module, ModuleCtx};
 use modules::logger::Logger;
 use modules::monitoring::Monitoring;
 use modules::network::Network;
+use modules::opcua::OPCUA;
 use modules::uploader::Uploader;
 use std::thread;
 use tokio::task::JoinSet;
@@ -21,25 +22,28 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let config = Config::parse_file(cli.config)?;
 
-    println!("{:?}", config.monitoring);
-
     let event_bus = EventBus::new();
+    let opcua_ctx = ModuleCtx::new("opcua", &event_bus);
     let logger_ctx = ModuleCtx::new("logger", &event_bus);
-    let network_ctx = ModuleCtx::new("network", &event_bus);
     let uploader_ctx = ModuleCtx::new("uploader", &event_bus);
     let monitoring_ctx = ModuleCtx::new("monitoring", &event_bus);
-
+    
     // Used to store async tasks. 
     let mut set = JoinSet::new();
+
+    // OPCUA
+    match config.opcua {
+        Some(opcua_config) => {
+            set.spawn(async move { 
+                OPCUA::new(opcua_ctx, opcua_config).run().await 
+            });
+        },
+        None =>  println!("Warn: Skipping OPCUA")    
+    }
 
     // Logger
     set.spawn(async move { 
         Logger::new(logger_ctx).run().await 
-    });
-
-    // Network
-    set.spawn(async move { 
-        Network::new(network_ctx).run().await 
     });
 
     // Uploader
@@ -64,8 +68,6 @@ async fn main() -> Result<()> {
             }
         });
     }
-
-    
 
     // Wait for all tasks to complete
     set.join_all().await;

@@ -1,23 +1,33 @@
 use crate::{event_bus::{Event, EventKind}, module::{Module, ModuleCtx}};
 use anyhow::{Ok, Result};
 use opcua::{
-    client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, MonitoredItem, Session},
+    client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, Session},
     crypto::SecurityPolicy,
     types::{
-        DataValue, EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId, StatusCode, TimestampsToReturn, UserTokenPolicy
+        DataValue, EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId, TimestampsToReturn, UserTokenPolicy
     },
 };
-use opcua::sync::RwLock;
+use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Config {
+    pub url: String,
+    pub namespace: u16,
+    pub variables: Vec<String>
+}
+
 
 pub struct OPCUA {
     ctx: ModuleCtx,
     client: Client,
+    config: Config
 }
 
+
 impl OPCUA {
-    pub fn new(ctx: ModuleCtx) -> Self {
-        let mut client = ClientBuilder::new()
+    pub fn new(ctx: ModuleCtx, config: Config) -> Self {
+        let client = ClientBuilder::new()
             .application_name("Simple Client")
             .application_uri("urn:SimpleClient")
             .product_uri("urn:SimpleClient")
@@ -27,7 +37,7 @@ impl OPCUA {
             .client()
             .unwrap();
 
-        Self { ctx, client }
+        Self { ctx, client, config }
     }
 
     pub fn data_value_to_string(data_value: &DataValue) -> String {
@@ -82,9 +92,9 @@ impl OPCUA {
         println!("Created a subscription with id = {}", subscription_id);
     
         // Create some monitored items
-        let items_to_create: Vec<MonitoredItemCreateRequest> = ["v1", "v2", "v3", "v4", "v5"]
+        let items_to_create: Vec<MonitoredItemCreateRequest> = self.config.variables
             .iter()
-            .map(|v| NodeId::new(ns, *v).into())
+            .map(|v| NodeId::new(ns, v.clone()).into())
             .collect();
         let _ = session
             .create_monitored_items(subscription_id, TimestampsToReturn::Both, items_to_create)
@@ -94,12 +104,11 @@ impl OPCUA {
     }
 }
 
-const DEFAULT_URL: &str = "opc.tcp://127.0.0.1:4855";
-
 impl Module for OPCUA {
     async fn run(&mut self) -> Result<()> {
+
         let endpoint: EndpointDescription = (
-            DEFAULT_URL,
+            self.config.url.as_str(),
             SecurityPolicy::None.to_str(),
             MessageSecurityMode::None,
             UserTokenPolicy::anonymous(),
@@ -111,7 +120,7 @@ impl Module for OPCUA {
         let handle = event_loop.spawn();
         session.wait_for_connection().await;
 
-        if let Err(result) = self.subscribe_to_variables(session.clone(), 2).await {
+        if let Err(result) = self.subscribe_to_variables(session.clone(), self.config.namespace).await {
             println!(
                 "ERROR: Got an error while subscribing to variables - {}",
                 result
