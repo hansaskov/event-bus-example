@@ -13,9 +13,16 @@ use std::{sync::Arc, time::Duration};
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub url: String,
-    pub namespace: u16,
-    pub variables: Vec<String>
+    pub node_ids: Vec<NewNodeId>
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewNodeId {
+    pub namespace: u16,
+    pub variable: String
+}
+
+
 
 
 pub struct OPCUA {
@@ -52,7 +59,7 @@ impl OPCUA {
         }
     }
 
-    pub async fn subscribe_to_variables(&self, session: Arc<Session>, ns: u16) -> Result<()> {
+    pub async fn subscribe_to_variables(&self, session: Arc<Session>) -> Result<()> {
         // Creates a subscription with a data change callback
         let sender = self.ctx.sender.clone();
         let module_name = self.ctx.name.clone();
@@ -92,9 +99,9 @@ impl OPCUA {
         println!("Created a subscription with id = {}", subscription_id);
     
         // Create some monitored items
-        let items_to_create: Vec<MonitoredItemCreateRequest> = self.config.variables
+        let items_to_create: Vec<MonitoredItemCreateRequest> = self.config.node_ids
             .iter()
-            .map(|v| NodeId::new(ns, v.clone()).into())
+            .map(|node| NodeId::new(node.namespace, node.variable.clone()).into())
             .collect();
         let _ = session
             .create_monitored_items(subscription_id, TimestampsToReturn::Both, items_to_create)
@@ -120,7 +127,7 @@ impl Module for OPCUA {
         let handle = event_loop.spawn();
         session.wait_for_connection().await;
 
-        if let Err(result) = self.subscribe_to_variables(session.clone(), self.config.namespace).await {
+        if let Err(result) = self.subscribe_to_variables(session.clone()).await {
             println!(
                 "ERROR: Got an error while subscribing to variables - {}",
                 result
