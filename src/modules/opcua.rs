@@ -3,7 +3,7 @@ use crate::{
     module::{Module, ModuleCtx},
     reading::Reading,
 };
-use anyhow::{Ok, Result};
+use anyhow::{Context, Ok, Result};
 use opcua::{
     client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, Session},
     crypto::SecurityPolicy,
@@ -105,10 +105,13 @@ impl OPCUA {
                         None => SystemTime::now(),
                     };
 
-                    let variable = &item.item_to_monitor().node_id.identifier;
+                    let identifier = item.item_to_monitor().node_id.identifier.to_string();
+                    let identifier_result = identifier.split_once('=');
 
-
-                    println!("Item has name: {variable}");
+                    let variable = match identifier_result {
+                        Some((_, identifier)) => identifier.to_string(),
+                        None => return,
+                    };
 
                     if let Some(new_node_id) = node_ids.iter().find(|v| v.variable == variable.to_string()) {
 
