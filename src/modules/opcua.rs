@@ -8,7 +8,7 @@ use opcua::{
     client::{Client, ClientBuilder, DataChangeCallback, IdentityToken, Session},
     crypto::SecurityPolicy,
     types::{
-        DynEncodable, EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId,
+        EndpointDescription, MessageSecurityMode, MonitoredItemCreateRequest, NodeId,
         TimestampsToReturn, UserTokenPolicy,
     },
 };
@@ -24,13 +24,13 @@ pub struct Config {
     pub node_ids: Vec<NewNodeId>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NewNodeId {
     pub namespace: u16,
     pub variable: String,
-    pub name: Option<String>,
-    pub category: Option<String>,
-    pub unit: Option<String>,
+    pub name: String,
+    pub category: String,
+    pub unit: String,
 }
 
 pub struct OPCUA {
@@ -62,6 +62,7 @@ impl OPCUA {
         // Creates a subscription with a data change callback
         let sender = self.ctx.sender.clone();
         let module_name = self.ctx.name.clone();
+        let node_ids = self.config.node_ids.clone();
 
         let subscription_id = session
             .create_subscription(
@@ -104,25 +105,29 @@ impl OPCUA {
                         None => SystemTime::now(),
                     };
 
-                    let name = &item.item_to_monitor().data_encoding.name;
+                    let name = &item.item_to_monitor().node_id.identifier;
 
-                    let reading = Reading {
-                        name: name.to_string(),
-                        category: "PLC".into(),
-                        unit: "Unit".into(),
-                        value: float,
-                        time: time,
-                    };
+                    if let Some(new_node_id) = node_ids.iter().find(|v| v.name == name.to_string()) {
 
-                    // Create and send the event directly
-                    let event = Event {
-                        module: module_name.clone(),
-                        inner: EventKind::Reading(reading),
-                    };
+                        let reading = Reading {
+                            name: new_node_id.name.clone(),
+                            category: new_node_id.category.clone(),
+                            unit: new_node_id.unit.clone(),
+                            value: float,
+                            time: time,
+                        };
+    
+                        // Create and send the event directly
+                        let event = Event {
+                            module: module_name.clone(),
+                            inner: EventKind::Reading(reading),
+                        };
+    
+                        if let Err(e) = sender.send(event) {
+                            eprintln!("Failed to send readings: {}", e);
+                        }
 
-                    if let Err(e) = sender.send(event) {
-                        eprintln!("Failed to send readings: {}", e);
-                    }
+                    }                                      
                 }),
             )
             .await?;
