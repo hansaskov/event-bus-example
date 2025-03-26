@@ -28,9 +28,9 @@ pub struct Config {
 pub struct NewNodeId {
     pub namespace: u16,
     pub variable: String,
-    pub name: String,
-    pub category: String,
-    pub unit: String,
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub unit: Option<String>,
 }
 
 pub struct OPCUA {
