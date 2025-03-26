@@ -105,12 +105,12 @@ impl OPCUA {
                         None => SystemTime::now(),
                     };
 
-                    let name = &item.item_to_monitor().node_id.identifier;
+                    let variable = &item.item_to_monitor().node_id.identifier;
 
 
-                    println!("Item has name: {name}");
+                    println!("Item has name: {variable}");
 
-                    if let Some(new_node_id) = node_ids.iter().find(|v| v.name == name.to_string()) {
+                    if let Some(new_node_id) = node_ids.iter().find(|v| v.variable == variable.to_string()) {
 
                         let reading = Reading {
                             name: new_node_id.name.clone(),
