@@ -107,6 +107,9 @@ impl OPCUA {
 
                     let name = &item.item_to_monitor().node_id.identifier;
 
+
+                    println!("Item has name: {name}");
+
                     if let Some(new_node_id) = node_ids.iter().find(|v| v.name == name.to_string()) {
 
                         let reading = Reading {
